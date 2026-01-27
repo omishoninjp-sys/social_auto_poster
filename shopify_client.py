@@ -214,7 +214,7 @@ class ShopifyClient:
     
     def add_tag_to_product(self, product_id, new_tag):
         """
-        為商品新增標籤
+        為商品新增標籤（使用 GraphQL API）
         
         Args:
             product_id: 商品 ID
@@ -233,6 +233,7 @@ class ShopifyClient:
         # 先取得商品目前的標籤
         product = self.get_product_by_id(product_id)
         if not product:
+            print(f"找不到商品: {product_id}")
             return False
         
         current_tags = product.get('tags', '')
@@ -247,21 +248,53 @@ class ShopifyClient:
         
         # 新增標籤
         tag_list.append(new_tag)
-        new_tags = ', '.join(tag_list)
         
-        # 更新商品（只傳 tags，不傳 id）
-        url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
-        payload = {
-            'product': {
-                'tags': new_tags
+        # 使用 GraphQL API 更新標籤
+        url = f"{self.store_url}/admin/api/2024-10/graphql.json"
+        
+        # GraphQL mutation
+        query = """
+        mutation tagsAdd($id: ID!, $tags: [String!]!) {
+            tagsAdd(id: $id, tags: $tags) {
+                node {
+                    id
+                }
+                userErrors {
+                    field
+                    message
+                }
             }
+        }
+        """
+        
+        variables = {
+            "id": f"gid://shopify/Product/{product_id}",
+            "tags": [new_tag]
+        }
+        
+        payload = {
+            "query": query,
+            "variables": variables
         }
         
         try:
-            response = self.session.put(url, json=payload, timeout=30)
+            response = self.session.post(url, json=payload, timeout=30)
             if not response.ok:
-                print(f"新增標籤失敗: {response.status_code} - {response.text}")
-            response.raise_for_status()
+                print(f"GraphQL 新增標籤失敗: {response.status_code} - {response.text}")
+                return False
+            
+            result = response.json()
+            
+            # 檢查是否有錯誤
+            if 'errors' in result:
+                print(f"GraphQL 錯誤: {result['errors']}")
+                return False
+            
+            user_errors = result.get('data', {}).get('tagsAdd', {}).get('userErrors', [])
+            if user_errors:
+                print(f"GraphQL userErrors: {user_errors}")
+                return False
+            
             return True
         except Exception as e:
             print(f"新增標籤失敗: {e}")
@@ -269,7 +302,7 @@ class ShopifyClient:
     
     def remove_tags_with_prefix(self, product_id, prefix):
         """
-        移除商品中符合前綴的標籤
+        移除商品中符合前綴的標籤（使用 GraphQL API）
         
         Args:
             product_id: 商品 ID
@@ -295,25 +328,57 @@ class ShopifyClient:
         else:
             tag_list = [t.strip() for t in current_tags.split(',') if t.strip()]
         
-        # 過濾掉符合前綴的標籤
-        new_tag_list = [t for t in tag_list if not t.startswith(prefix)]
+        # 找出要移除的標籤
+        tags_to_remove = [t for t in tag_list if t.startswith(prefix)]
         
-        if len(new_tag_list) == len(tag_list):
-            # 沒有變化
+        if not tags_to_remove:
+            # 沒有要移除的標籤
             return True
         
-        new_tags = ', '.join(new_tag_list)
+        # 使用 GraphQL API 移除標籤
+        url = f"{self.store_url}/admin/api/2024-10/graphql.json"
         
-        url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
-        payload = {
-            'product': {
-                'tags': new_tags
+        query = """
+        mutation tagsRemove($id: ID!, $tags: [String!]!) {
+            tagsRemove(id: $id, tags: $tags) {
+                node {
+                    id
+                }
+                userErrors {
+                    field
+                    message
+                }
             }
+        }
+        """
+        
+        variables = {
+            "id": f"gid://shopify/Product/{product_id}",
+            "tags": tags_to_remove
+        }
+        
+        payload = {
+            "query": query,
+            "variables": variables
         }
         
         try:
-            response = self.session.put(url, json=payload, timeout=30)
-            response.raise_for_status()
+            response = self.session.post(url, json=payload, timeout=30)
+            if not response.ok:
+                print(f"GraphQL 移除標籤失敗: {response.status_code} - {response.text}")
+                return False
+            
+            result = response.json()
+            
+            if 'errors' in result:
+                print(f"GraphQL 錯誤: {result['errors']}")
+                return False
+            
+            user_errors = result.get('data', {}).get('tagsRemove', {}).get('userErrors', [])
+            if user_errors:
+                print(f"GraphQL userErrors: {user_errors}")
+                return False
+            
             return True
         except Exception as e:
             print(f"移除標籤失敗: {e}")
