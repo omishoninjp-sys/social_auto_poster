@@ -55,7 +55,7 @@ class FacebookClient:
         if link:
             data['link'] = link
         
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         response.raise_for_status()
         return response.json()
     
@@ -69,7 +69,7 @@ class FacebookClient:
             'access_token': self.access_token
         }
         
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         if not response.ok:
             error_detail = response.json() if response.text else response.text
             raise Exception(f"Facebook API 錯誤: {error_detail}")
@@ -83,7 +83,7 @@ class FacebookClient:
             'access_token': self.access_token
         }
         
-        response = self.session.get(url, params=params)
+        response = self.session.get(url, params=params, timeout=60)
         response.raise_for_status()
         return response.json()
     
@@ -107,7 +107,7 @@ class FacebookClient:
                 'published': 'false',
                 'access_token': self.access_token
             }
-            response = self.session.post(url, data=data)
+            response = self.session.post(url, data=data, timeout=60)
             if not response.ok:
                 error_detail = response.json() if response.text else response.text
                 raise Exception(f"Facebook 上傳圖片錯誤: {error_detail}")
@@ -123,7 +123,7 @@ class FacebookClient:
         for i, photo_id in enumerate(photo_ids):
             data[f'attached_media[{i}]'] = f'{{"media_fbid":"{photo_id}"}}'
         
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         if not response.ok:
             error_detail = response.json() if response.text else response.text
             raise Exception(f"Facebook API 錯誤: {error_detail}")
@@ -177,7 +177,7 @@ class InstagramClient:
             'access_token': self.access_token
         }
         
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         if not response.ok:
             error_detail = response.json() if response.text else response.text
             raise Exception(f"Instagram API 錯誤: {error_detail}")
@@ -194,7 +194,7 @@ class InstagramClient:
         
         start_time = time.time()
         while time.time() - start_time < max_wait:
-            response = self.session.get(url, params=params)
+            response = self.session.get(url, params=params, timeout=60)
             data = response.json()
             
             status = data.get('status_code')
@@ -216,7 +216,7 @@ class InstagramClient:
             'access_token': self.access_token
         }
         
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         if not response.ok:
             error_detail = response.json() if response.text else response.text
             raise Exception(f"Instagram 發布錯誤: {error_detail}")
@@ -249,7 +249,7 @@ class InstagramClient:
                 'is_carousel_item': 'true',
                 'access_token': self.access_token
             }
-            response = self.session.post(url, data=data)
+            response = self.session.post(url, data=data, timeout=60)
             if not response.ok:
                 error_detail = response.json() if response.text else response.text
                 raise Exception(f"Instagram 輪播子項目錯誤: {error_detail}")
@@ -263,7 +263,7 @@ class InstagramClient:
             'children': ','.join(children_ids),
             'access_token': self.access_token
         }
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         if not response.ok:
             error_detail = response.json() if response.text else response.text
             raise Exception(f"Instagram 輪播容器錯誤: {error_detail}")
@@ -330,7 +330,7 @@ class ThreadsClient:
         if link_attachment:
             data['link_attachment'] = link_attachment
         
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         if not response.ok:
             error_detail = response.json() if response.text else response.text
             raise Exception(f"Threads API 錯誤: {error_detail}")
@@ -346,7 +346,7 @@ class ThreadsClient:
         
         start_time = time.time()
         while time.time() - start_time < max_wait:
-            response = self.session.get(url, params=params)
+            response = self.session.get(url, params=params, timeout=60)
             data = response.json()
             
             status = data.get('status')
@@ -368,7 +368,7 @@ class ThreadsClient:
             'access_token': self.access_token
         }
         
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         if not response.ok:
             error_detail = response.json() if response.text else response.text
             raise Exception(f"Threads 發布錯誤: {error_detail}")
@@ -402,7 +402,7 @@ class ThreadsClient:
                 'is_carousel_item': 'true',
                 'access_token': self.access_token
             }
-            response = self.session.post(url, data=data)
+            response = self.session.post(url, data=data, timeout=60)
             if not response.ok:
                 error_detail = response.json() if response.text else response.text
                 raise Exception(f"Threads 輪播子項目錯誤: {error_detail}")
@@ -416,7 +416,7 @@ class ThreadsClient:
             'children': ','.join(children_ids),
             'access_token': self.access_token
         }
-        response = self.session.post(url, data=data)
+        response = self.session.post(url, data=data, timeout=60)
         if not response.ok:
             error_detail = response.json() if response.text else response.text
             raise Exception(f"Threads 輪播容器錯誤: {error_detail}")
@@ -436,7 +436,7 @@ class ThreadsClient:
             'access_token': self.access_token
         }
         
-        response = self.session.get(url, params=params)
+        response = self.session.get(url, params=params, timeout=60)
         response.raise_for_status()
         return response.json()
 
