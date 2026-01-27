@@ -746,8 +746,11 @@ def post_to_platforms(content, platforms, config):
         try:
             threads = ThreadsClient(config.THREADS_USER_ID, config.THREADS_ACCESS_TOKEN)
             image_urls = content.get('image_urls', [])
-            if len(image_urls) > 1:
-                result = threads.post_carousel(content.get('text_no_tags', content['text']), image_urls[:20])
+            if len(image_urls) > 3:
+                # 圖片多於 3 張時，只用前 3 張
+                result = threads.post_carousel(content.get('text_no_tags', content['text']), image_urls[:3])
+            elif len(image_urls) > 1:
+                result = threads.post_carousel(content.get('text_no_tags', content['text']), image_urls)
             else:
                 result = threads.post(content.get('text_no_tags', content['text']), content['image_url'])
             results['threads'] = {'success': True, 'post_id': result.get('id')}
