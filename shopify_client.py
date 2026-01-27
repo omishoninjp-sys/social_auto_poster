@@ -227,6 +227,9 @@ class ShopifyClient:
             print("需要 Admin API Token 才能新增標籤")
             return False
         
+        # 確保 product_id 是整數
+        product_id = int(product_id)
+        
         # 先取得商品目前的標籤
         product = self.get_product_by_id(product_id)
         if not product:
@@ -246,11 +249,10 @@ class ShopifyClient:
         tag_list.append(new_tag)
         new_tags = ', '.join(tag_list)
         
-        # 更新商品（使用較新的 API 版本）
+        # 更新商品（只傳 tags，不傳 id）
         url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
         payload = {
             'product': {
-                'id': product_id,
                 'tags': new_tags
             }
         }
@@ -280,6 +282,9 @@ class ShopifyClient:
             print("需要 Admin API Token 才能移除標籤")
             return False
         
+        # 確保 product_id 是整數
+        product_id = int(product_id)
+        
         product = self.get_product_by_id(product_id)
         if not product:
             return False
@@ -302,7 +307,6 @@ class ShopifyClient:
         url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
         payload = {
             'product': {
-                'id': product_id,
                 'tags': new_tags
             }
         }
