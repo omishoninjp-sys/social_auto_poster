@@ -1,5 +1,5 @@
 {
   "$schema": "https://schema.zeabur.app/template.json",
   "build_command": "pip install -r requirements.txt",
-  "start_command": "gunicorn app:app --bind 0.0.0.0:$PORT"
+  "start_command": "gunicorn app:app -c gunicorn.conf.py"
 }
