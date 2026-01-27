@@ -939,7 +939,8 @@ def stats():
 @app.route('/post/smart')
 def post_smart():
     """
-    智慧發文（1:1 伴手禮/服飾交替，新上架優先）
+    智慧發文（1:1 伴手禮/服飾交替）
+    背景執行，立刻回應
     
     Query params:
     - count: 發幾篇（預設 1，最多 10）
@@ -947,6 +948,8 @@ def post_smart():
     - platforms: 平台，逗號分隔（選填）
     - secret: API 密鑰（建議設定）
     """
+    import threading
+    
     # 驗證 API 密鑰
     api_secret = os.getenv('API_SECRET')
     if api_secret:
@@ -954,46 +957,47 @@ def post_smart():
         if provided_secret != api_secret:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     
-    config = get_config()
-    shopify = get_shopify_client(config)
-    selector = SmartSelector(shopify, config)
-    
     count = min(int(request.args.get('count', 1)), 10)
     category = request.args.get('category')
     platforms_str = request.args.get('platforms', 'fb,ig,threads')
     platforms = [p.strip() for p in platforms_str.split(',')]
     
-    posted = []
+    # 背景執行發文
+    def do_post():
+        config = get_config()
+        shopify = get_shopify_client(config)
+        selector = SmartSelector(shopify, config)
+        
+        for i in range(count):
+            product, cat = selector.get_next_product(category)
+            
+            if not product:
+                print(f"[背景發文] 沒有找到商品")
+                break
+            
+            print(f"[背景發文] 開始發文: {product.get('title')}")
+            
+            content = generate_post_content(product, config)
+            results = post_to_platforms(content, platforms, config)
+            
+            # 印出結果
+            for platform, result in results.items():
+                if result.get('success'):
+                    print(f"[背景發文] ✅ {platform} 成功")
+                else:
+                    print(f"[背景發文] ❌ {platform} 失敗: {result.get('error')}")
     
-    for i in range(count):
-        # 取得下一個商品
-        product, cat = selector.get_next_product(category)
-        
-        if not product:
-            break
-        
-        # 生成貼文
-        content = generate_post_content(product, config)
-        
-        # 發布
-        results = post_to_platforms(content, platforms, config)
-        
-        # 標記已發文
-        all_success = all(r.get('success') for r in results.values())
-        if all_success:
-            selector.mark_as_posted(product, cat)
-        
-        posted.append({
-            'title': product.get('title'),
-            'category': '伴手禮' if cat == 'souvenir' else '服飾',
-            'platforms': results,
-            'marked': all_success
-        })
+    # 啟動背景執行緒
+    thread = threading.Thread(target=do_post)
+    thread.start()
     
+    # 立刻回應
     return jsonify({
-        'success': len(posted) > 0,
-        'count': len(posted),
-        'posts': posted,
+        'success': True,
+        'message': '發文請求已收到，背景執行中',
+        'count': count,
+        'category': category or '自動交替',
+        'platforms': platforms,
         'timestamp': datetime.now().isoformat()
     })
 
