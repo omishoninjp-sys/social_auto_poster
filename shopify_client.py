@@ -214,7 +214,7 @@ class ShopifyClient:
     
     def add_tag_to_product(self, product_id, new_tag):
         """
-        為商品新增標籤（使用 GraphQL API）
+        為商品新增標籤
         
         Args:
             product_id: 商品 ID
@@ -244,57 +244,45 @@ class ShopifyClient:
         
         # 如果標籤已存在，不重複新增
         if new_tag in tag_list:
+            print(f"標籤已存在: {new_tag}")
             return True
         
         # 新增標籤
         tag_list.append(new_tag)
+        new_tags = ', '.join(tag_list)
         
-        # 使用 GraphQL API 更新標籤
-        url = f"{self.store_url}/admin/api/2024-10/graphql.json"
-        
-        # GraphQL mutation
-        query = """
-        mutation tagsAdd($id: ID!, $tags: [String!]!) {
-            tagsAdd(id: $id, tags: $tags) {
-                node {
-                    id
-                }
-                userErrors {
-                    field
-                    message
-                }
-            }
-        }
-        """
-        
-        variables = {
-            "id": f"gid://shopify/Product/{product_id}",
-            "tags": [new_tag]
-        }
+        # 使用 REST API 更新標籤
+        url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
         
         payload = {
-            "query": query,
-            "variables": variables
+            'product': {
+                'id': product_id,
+                'tags': new_tags
+            }
         }
         
+        print(f"[DEBUG] URL: {url}")
+        print(f"[DEBUG] Payload: {payload}")
+        print(f"[DEBUG] Current tags count: {len(tag_list)}")
+        
         try:
-            response = self.session.post(url, json=payload, timeout=30)
+            import json as json_module
+            headers = {
+                'X-Shopify-Access-Token': self.access_token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+            response = requests.put(url, data=json_module.dumps(payload), headers=headers, timeout=30)
+            
+            print(f"[DEBUG] Response status: {response.status_code}")
+            print(f"[DEBUG] Response headers: {dict(response.headers)}")
+            print(f"[DEBUG] Response body: {response.text[:500]}")
+            
             if not response.ok:
-                print(f"GraphQL 新增標籤失敗: {response.status_code} - {response.text}")
+                print(f"新增標籤失敗: {response.status_code} - {response.text}")
                 return False
             
-            result = response.json()
-            
-            # 檢查是否有錯誤
-            if 'errors' in result:
-                print(f"GraphQL 錯誤: {result['errors']}")
-                return False
-            
-            user_errors = result.get('data', {}).get('tagsAdd', {}).get('userErrors', [])
-            if user_errors:
-                print(f"GraphQL userErrors: {user_errors}")
-                return False
-            
+            print(f"✅ 標籤新增成功: {new_tag}")
             return True
         except Exception as e:
             print(f"新增標籤失敗: {e}")
@@ -302,7 +290,7 @@ class ShopifyClient:
     
     def remove_tags_with_prefix(self, product_id, prefix):
         """
-        移除商品中符合前綴的標籤（使用 GraphQL API）
+        移除商品中符合前綴的標籤
         
         Args:
             product_id: 商品 ID
@@ -328,55 +316,34 @@ class ShopifyClient:
         else:
             tag_list = [t.strip() for t in current_tags.split(',') if t.strip()]
         
-        # 找出要移除的標籤
-        tags_to_remove = [t for t in tag_list if t.startswith(prefix)]
+        # 過濾掉符合前綴的標籤
+        new_tag_list = [t for t in tag_list if not t.startswith(prefix)]
         
-        if not tags_to_remove:
-            # 沒有要移除的標籤
+        if len(new_tag_list) == len(tag_list):
+            # 沒有變化
             return True
         
-        # 使用 GraphQL API 移除標籤
-        url = f"{self.store_url}/admin/api/2024-10/graphql.json"
+        new_tags = ', '.join(new_tag_list)
         
-        query = """
-        mutation tagsRemove($id: ID!, $tags: [String!]!) {
-            tagsRemove(id: $id, tags: $tags) {
-                node {
-                    id
-                }
-                userErrors {
-                    field
-                    message
-                }
-            }
-        }
-        """
-        
-        variables = {
-            "id": f"gid://shopify/Product/{product_id}",
-            "tags": tags_to_remove
-        }
-        
+        url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
         payload = {
-            "query": query,
-            "variables": variables
+            'product': {
+                'id': product_id,
+                'tags': new_tags
+            }
         }
         
         try:
-            response = self.session.post(url, json=payload, timeout=30)
+            import json as json_module
+            headers = {
+                'X-Shopify-Access-Token': self.access_token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+            response = requests.put(url, data=json_module.dumps(payload), headers=headers, timeout=30)
+            
             if not response.ok:
-                print(f"GraphQL 移除標籤失敗: {response.status_code} - {response.text}")
-                return False
-            
-            result = response.json()
-            
-            if 'errors' in result:
-                print(f"GraphQL 錯誤: {result['errors']}")
-                return False
-            
-            user_errors = result.get('data', {}).get('tagsRemove', {}).get('userErrors', [])
-            if user_errors:
-                print(f"GraphQL userErrors: {user_errors}")
+                print(f"移除標籤失敗: {response.status_code} - {response.text}")
                 return False
             
             return True
