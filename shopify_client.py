@@ -33,7 +33,7 @@ class ShopifyClient:
         """發送 API 請求"""
         if self.access_token:
             # Admin API (需要 access token)
-            url = f"{self.store_url}/admin/api/2024-01/{endpoint}"
+            url = f"{self.store_url}/admin/api/2024-10/{endpoint}"
         else:
             # Storefront API (公開)
             url = f"{self.store_url}/{endpoint}"
@@ -246,8 +246,8 @@ class ShopifyClient:
         tag_list.append(new_tag)
         new_tags = ', '.join(tag_list)
         
-        # 更新商品
-        url = f"{self.store_url}/admin/api/2024-01/products/{product_id}.json"
+        # 更新商品（使用較新的 API 版本）
+        url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
         payload = {
             'product': {
                 'id': product_id,
@@ -257,6 +257,8 @@ class ShopifyClient:
         
         try:
             response = self.session.put(url, json=payload, timeout=30)
+            if not response.ok:
+                print(f"新增標籤失敗: {response.status_code} - {response.text}")
             response.raise_for_status()
             return True
         except Exception as e:
@@ -297,7 +299,7 @@ class ShopifyClient:
         
         new_tags = ', '.join(new_tag_list)
         
-        url = f"{self.store_url}/admin/api/2024-01/products/{product_id}.json"
+        url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
         payload = {
             'product': {
                 'id': product_id,
