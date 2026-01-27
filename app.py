@@ -6,7 +6,7 @@ Flask API 版本 - 適合部署到 Zeabur
 部署到 Zeabur 後，使用 cron-job.org 定時呼叫 API
 """
 
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, make_response, redirect
 import random
 import os
 import requests
@@ -18,6 +18,122 @@ from config import Config
 import re
 
 app = Flask(__name__)
+
+# ============================================
+# 登入頁面模板
+# ============================================
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登入 - 御用達 GOYOUTATI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .login-card h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .login-card p {
+            color: #666;
+            margin-bottom: 24px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #555;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .error.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>🎌 御用達 GOYOUTATI</h1>
+        <p>社群自動發文系統</p>
+        
+        <div class="error" id="error">密鑰錯誤，請重試</div>
+        
+        <form method="POST" action="/login">
+            <div class="form-group">
+                <label>API 密鑰</label>
+                <input type="password" name="secret" placeholder="請輸入密鑰" required>
+            </div>
+            <button type="submit" class="btn">登入</button>
+        </form>
+    </div>
+    
+    <script>
+        // 檢查 URL 是否有 error 參數
+        if (window.location.search.includes('error=1')) {
+            document.getElementById('error').classList.add('show');
+        }
+    </script>
+</body>
+</html>
+"""
 
 # ============================================
 # HTML 管理頁面模板
@@ -59,6 +175,21 @@ ADMIN_HTML = """
         }
         .header p {
             opacity: 0.9;
+        }
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
         }
         .stats-grid {
             display: grid;
@@ -190,6 +321,7 @@ ADMIN_HTML = """
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 13px;
+            word-break: break-all;
         }
         .form-group {
             margin-bottom: 16px;
@@ -221,6 +353,8 @@ ADMIN_HTML = """
     </style>
 </head>
 <body>
+    <a href="/logout" class="logout-btn">登出</a>
+    
     <div class="container">
         <div class="header">
             <h1>🎌 御用達 GOYOUTATI</h1>
@@ -313,13 +447,12 @@ ADMIN_HTML = """
     </div>
 
     <script>
-        const API_SECRET = new URLSearchParams(window.location.search).get('secret') || '';
         const BASE_URL = window.location.origin;
         
         // 載入統計
         async function loadStats() {
             try {
-                const res = await fetch(`${BASE_URL}/stats?secret=${API_SECRET}`);
+                const res = await fetch(`${BASE_URL}/api/stats`);
                 const data = await res.json();
                 
                 if (data.success) {
@@ -354,7 +487,7 @@ ADMIN_HTML = """
             document.getElementById('result-box').classList.remove('show');
             
             try {
-                let url = `${BASE_URL}/post/smart?secret=${API_SECRET}&count=${count}&platforms=${platforms.join(',')}`;
+                let url = `${BASE_URL}/api/post?count=${count}&platforms=${platforms.join(',')}`;
                 if (category) url += `&category=${category}`;
                 
                 const res = await fetch(url);
@@ -376,8 +509,12 @@ ADMIN_HTML = """
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             loadStats();
-            document.getElementById('api-url').textContent = 
-                `${BASE_URL}/post/smart?secret=${API_SECRET || '你的密鑰'}`;
+            // 顯示 cron-job 用的 API URL（需要帶 secret）
+            fetch(`${BASE_URL}/api/get-secret-url`)
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('api-url').textContent = d.url;
+                });
         });
     </script>
 </body>
@@ -621,24 +758,135 @@ def post_to_platforms(content, platforms, config):
 
 @app.route('/')
 def index():
-    """管理頁面"""
-    # 檢查是否有 secret 參數，有的話顯示管理頁面
+    """首頁 - 檢查登入狀態"""
     api_secret = os.getenv('API_SECRET')
-    provided_secret = request.args.get('secret')
     
-    if api_secret and provided_secret == api_secret:
+    # 檢查 Cookie 是否有正確的 secret
+    cookie_secret = request.cookies.get('auth_secret')
+    
+    if api_secret and cookie_secret == api_secret:
+        # 已登入，顯示管理頁面
         return render_template_string(ADMIN_HTML)
     
-    # 沒有 secret 或 secret 錯誤，顯示 API 說明
+    # 未登入，顯示登入頁面
+    return render_template_string(LOGIN_HTML)
+
+@app.route('/login', methods=['POST'])
+def login():
+    """登入處理"""
+    api_secret = os.getenv('API_SECRET')
+    provided_secret = request.form.get('secret', '')
+    
+    if api_secret and provided_secret == api_secret:
+        # 登入成功，設定 Cookie
+        response = make_response(redirect('/'))
+        response.set_cookie('auth_secret', provided_secret, max_age=60*60*24*30, httponly=True)  # 30 天
+        return response
+    
+    # 登入失敗
+    return redirect('/?error=1')
+
+@app.route('/logout')
+def logout():
+    """登出"""
+    response = make_response(redirect('/'))
+    response.delete_cookie('auth_secret')
+    return response
+
+def check_auth():
+    """檢查是否已登入（用於內部 API）"""
+    api_secret = os.getenv('API_SECRET')
+    cookie_secret = request.cookies.get('auth_secret')
+    return api_secret and cookie_secret == api_secret
+
+@app.route('/api/stats')
+def api_stats():
+    """內部 API - 發文統計（需登入）"""
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    config = get_config()
+    shopify = get_shopify_client(config)
+    selector = SmartSelector(shopify, config)
+    
+    stats = selector.get_stats()
+    
     return jsonify({
-        'service': '御用達 GOYOUTATI - 社群自動發文 API',
-        'admin': '請加上 ?secret=你的密鑰 進入管理頁面',
-        'endpoints': {
-            '/post/smart': 'GET - 智慧發文（1:1 伴手禮/服飾交替）',
-            '/post/random': 'GET - 隨機發布',
-            '/stats': 'GET - 發文統計',
-            '/health': 'GET - 健康檢查'
-        }
+        'success': True,
+        'stats': {
+            'souvenir': {
+                'name': '伴手禮',
+                'total': stats['souvenir']['total'],
+                'round': stats['souvenir']['round'],
+                'posted_this_round': stats['souvenir']['posted_this_round'],
+                'remaining': stats['souvenir']['remaining']
+            },
+            'fashion': {
+                'name': '服飾',
+                'total': stats['fashion']['total'],
+                'round': stats['fashion']['round'],
+                'posted_this_round': stats['fashion']['posted_this_round'],
+                'remaining': stats['fashion']['remaining']
+            }
+        },
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/post')
+def api_post():
+    """內部 API - 發文（需登入）"""
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    config = get_config()
+    shopify = get_shopify_client(config)
+    selector = SmartSelector(shopify, config)
+    
+    count = min(int(request.args.get('count', 1)), 10)
+    category = request.args.get('category')
+    platforms_str = request.args.get('platforms', 'fb,ig,threads')
+    platforms = [p.strip() for p in platforms_str.split(',')]
+    
+    posted = []
+    
+    for i in range(count):
+        product, cat = selector.get_next_product(category)
+        
+        if not product:
+            break
+        
+        content = generate_post_content(product, config)
+        results = post_to_platforms(content, platforms, config)
+        
+        all_success = all(r.get('success') for r in results.values()) if results else False
+        if all_success:
+            selector.mark_as_posted(product, cat)
+        
+        posted.append({
+            'title': product.get('title'),
+            'category': '伴手禮' if cat == 'souvenir' else '服飾',
+            'platforms': results,
+            'marked': all_success
+        })
+    
+    return jsonify({
+        'success': len(posted) > 0,
+        'count': len(posted),
+        'posts': posted,
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/get-secret-url')
+def api_get_secret_url():
+    """取得帶 secret 的 API URL（給 cron-job 用）"""
+    if not check_auth():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    api_secret = os.getenv('API_SECRET', '')
+    base_url = request.host_url.rstrip('/')
+    
+    return jsonify({
+        'url': f"{base_url}/post/smart?secret={api_secret}"
     })
 
 @app.route('/health')
