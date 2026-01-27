@@ -33,7 +33,7 @@ class ShopifyClient:
         """發送 API 請求"""
         if self.access_token:
             # Admin API (需要 access token)
-            url = f"{self.store_url}/admin/api/2024-10/{endpoint}"
+            url = f"{self.store_url}/admin/api/2024-01/{endpoint}"
         else:
             # Storefront API (公開)
             url = f"{self.store_url}/{endpoint}"
@@ -227,13 +227,9 @@ class ShopifyClient:
             print("需要 Admin API Token 才能新增標籤")
             return False
         
-        # 確保 product_id 是整數
-        product_id = int(product_id)
-        
         # 先取得商品目前的標籤
         product = self.get_product_by_id(product_id)
         if not product:
-            print(f"找不到商品: {product_id}")
             return False
         
         current_tags = product.get('tags', '')
@@ -244,16 +240,14 @@ class ShopifyClient:
         
         # 如果標籤已存在，不重複新增
         if new_tag in tag_list:
-            print(f"標籤已存在: {new_tag}")
             return True
         
         # 新增標籤
         tag_list.append(new_tag)
         new_tags = ', '.join(tag_list)
         
-        # 使用 REST API 更新標籤
-        url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
-        
+        # 更新商品
+        url = f"{self.store_url}/admin/api/2024-01/products/{product_id}.json"
         payload = {
             'product': {
                 'id': product_id,
@@ -261,28 +255,9 @@ class ShopifyClient:
             }
         }
         
-        print(f"[DEBUG] URL: {url}")
-        print(f"[DEBUG] Payload: {payload}")
-        print(f"[DEBUG] Current tags count: {len(tag_list)}")
-        
         try:
-            import json as json_module
-            headers = {
-                'X-Shopify-Access-Token': self.access_token,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-            response = requests.put(url, data=json_module.dumps(payload), headers=headers, timeout=30)
-            
-            print(f"[DEBUG] Response status: {response.status_code}")
-            print(f"[DEBUG] Response headers: {dict(response.headers)}")
-            print(f"[DEBUG] Response body: {response.text[:500]}")
-            
-            if not response.ok:
-                print(f"新增標籤失敗: {response.status_code} - {response.text}")
-                return False
-            
-            print(f"✅ 標籤新增成功: {new_tag}")
+            response = self.session.put(url, json=payload, timeout=30)
+            response.raise_for_status()
             return True
         except Exception as e:
             print(f"新增標籤失敗: {e}")
@@ -303,9 +278,6 @@ class ShopifyClient:
             print("需要 Admin API Token 才能移除標籤")
             return False
         
-        # 確保 product_id 是整數
-        product_id = int(product_id)
-        
         product = self.get_product_by_id(product_id)
         if not product:
             return False
@@ -325,7 +297,7 @@ class ShopifyClient:
         
         new_tags = ', '.join(new_tag_list)
         
-        url = f"{self.store_url}/admin/api/2024-10/products/{product_id}.json"
+        url = f"{self.store_url}/admin/api/2024-01/products/{product_id}.json"
         payload = {
             'product': {
                 'id': product_id,
@@ -334,18 +306,8 @@ class ShopifyClient:
         }
         
         try:
-            import json as json_module
-            headers = {
-                'X-Shopify-Access-Token': self.access_token,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-            response = requests.put(url, data=json_module.dumps(payload), headers=headers, timeout=30)
-            
-            if not response.ok:
-                print(f"移除標籤失敗: {response.status_code} - {response.text}")
-                return False
-            
+            response = self.session.put(url, json=payload, timeout=30)
+            response.raise_for_status()
             return True
         except Exception as e:
             print(f"移除標籤失敗: {e}")
