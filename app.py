@@ -6,7 +6,7 @@ Flask API 版本 - 適合部署到 Zeabur
 部署到 Zeabur 後，使用 cron-job.org 定時呼叫 API
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
 import random
 import os
 import requests
@@ -18,6 +18,371 @@ from config import Config
 import re
 
 app = Flask(__name__)
+
+# ============================================
+# HTML 管理頁面模板
+# ============================================
+ADMIN_HTML = """
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>御用達 GOYOUTATI - 社群自動發文系統</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        .header p {
+            opacity: 0.9;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-box.souvenir {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+        }
+        .stat-box.fashion {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        }
+        .stat-box h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .stat-box .number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+        }
+        .stat-box .detail {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status.online {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        .result-box {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+            display: none;
+        }
+        .result-box.show {
+            display: block;
+        }
+        .result-box pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-size: 13px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .loading.show {
+            display: block;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #333;
+        }
+        .api-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        .api-info code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #555;
+        }
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .checkbox-group {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎌 御用達 GOYOUTATI</h1>
+            <p>社群自動發文系統</p>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 class="section-title" style="margin-bottom: 0;">📊 發文統計</h2>
+                <span class="status online">● 系統運作中</span>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-box souvenir">
+                    <h3>🍪 伴手禮</h3>
+                    <div class="number" id="souvenir-remaining">-</div>
+                    <div class="detail">剩餘未發 / 總數 <span id="souvenir-total">-</span></div>
+                    <div class="detail">第 <span id="souvenir-round">-</span> 輪</div>
+                </div>
+                <div class="stat-box fashion">
+                    <h3>👔 服飾</h3>
+                    <div class="number" id="fashion-remaining">-</div>
+                    <div class="detail">剩餘未發 / 總數 <span id="fashion-total">-</span></div>
+                    <div class="detail">第 <span id="fashion-round">-</span> 輪</div>
+                </div>
+            </div>
+            
+            <button class="btn btn-secondary" onclick="loadStats()">🔄 重新整理</button>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">🚀 立即發文</h2>
+            
+            <div class="form-group">
+                <label>發文數量</label>
+                <select id="post-count">
+                    <option value="1">1 篇</option>
+                    <option value="2">2 篇（1 伴手禮 + 1 服飾）</option>
+                    <option value="4">4 篇</option>
+                    <option value="6">6 篇</option>
+                    <option value="10">10 篇</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>指定類別</label>
+                <select id="post-category">
+                    <option value="">自動交替（1:1）</option>
+                    <option value="souvenir">只發伴手禮</option>
+                    <option value="fashion">只發服飾</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>發布平台</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="platform-fb" checked> Facebook</label>
+                    <label><input type="checkbox" id="platform-ig" checked> Instagram</label>
+                    <label><input type="checkbox" id="platform-threads" checked> Threads</label>
+                </div>
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="postNow()">🚀 立即發文</button>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>發文中，請稍候...</p>
+            </div>
+            
+            <div class="result-box" id="result-box">
+                <strong>發文結果：</strong>
+                <pre id="result-content"></pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">⏰ 排程設定</h2>
+            <p style="color: #666; margin-bottom: 16px;">使用 cron-job.org 設定自動發文排程</p>
+            
+            <div class="api-info">
+                <p><strong>API 網址：</strong></p>
+                <code id="api-url">載入中...</code>
+                <p style="margin-top: 12px; font-size: 13px; color: #666;">
+                    在 cron-job.org 建立排程，設定每天特定時間呼叫此網址
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_SECRET = new URLSearchParams(window.location.search).get('secret') || '';
+        const BASE_URL = window.location.origin;
+        
+        // 載入統計
+        async function loadStats() {
+            try {
+                const res = await fetch(`${BASE_URL}/stats?secret=${API_SECRET}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    document.getElementById('souvenir-remaining').textContent = data.stats.souvenir.remaining;
+                    document.getElementById('souvenir-total').textContent = data.stats.souvenir.total;
+                    document.getElementById('souvenir-round').textContent = data.stats.souvenir.round;
+                    
+                    document.getElementById('fashion-remaining').textContent = data.stats.fashion.remaining;
+                    document.getElementById('fashion-total').textContent = data.stats.fashion.total;
+                    document.getElementById('fashion-round').textContent = data.stats.fashion.round;
+                }
+            } catch (e) {
+                console.error('載入統計失敗', e);
+            }
+        }
+        
+        // 立即發文
+        async function postNow() {
+            const count = document.getElementById('post-count').value;
+            const category = document.getElementById('post-category').value;
+            const platforms = [];
+            if (document.getElementById('platform-fb').checked) platforms.push('fb');
+            if (document.getElementById('platform-ig').checked) platforms.push('ig');
+            if (document.getElementById('platform-threads').checked) platforms.push('threads');
+            
+            if (platforms.length === 0) {
+                alert('請至少選擇一個平台');
+                return;
+            }
+            
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('result-box').classList.remove('show');
+            
+            try {
+                let url = `${BASE_URL}/post/smart?secret=${API_SECRET}&count=${count}&platforms=${platforms.join(',')}`;
+                if (category) url += `&category=${category}`;
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                document.getElementById('result-content').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('result-box').classList.add('show');
+                
+                // 重新載入統計
+                loadStats();
+            } catch (e) {
+                document.getElementById('result-content').textContent = '發文失敗: ' + e.message;
+                document.getElementById('result-box').classList.add('show');
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            document.getElementById('api-url').textContent = 
+                `${BASE_URL}/post/smart?secret=${API_SECRET || '你的密鑰'}`;
+        });
+    </script>
+</body>
+</html>
+"""
 
 def get_config():
     """取得設定"""
@@ -256,9 +621,18 @@ def post_to_platforms(content, platforms, config):
 
 @app.route('/')
 def index():
-    """首頁"""
+    """管理頁面"""
+    # 檢查是否有 secret 參數，有的話顯示管理頁面
+    api_secret = os.getenv('API_SECRET')
+    provided_secret = request.args.get('secret')
+    
+    if api_secret and provided_secret == api_secret:
+        return render_template_string(ADMIN_HTML)
+    
+    # 沒有 secret 或 secret 錯誤，顯示 API 說明
     return jsonify({
         'service': '御用達 GOYOUTATI - 社群自動發文 API',
+        'admin': '請加上 ?secret=你的密鑰 進入管理頁面',
         'endpoints': {
             '/post/smart': 'GET - 智慧發文（1:1 伴手禮/服飾交替）',
             '/post/random': 'GET - 隨機發布',
