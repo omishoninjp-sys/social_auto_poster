@@ -715,9 +715,10 @@ def generate_post_content(product, config):
     }
 
 def post_to_platforms(content, platforms, config):
-    """發布到各平台"""
+    """發布到各平台（貼文 + 限動）"""
     results = {}
     
+    # Facebook 貼文
     if 'fb' in platforms and config.FB_PAGE_ID and config.FB_ACCESS_TOKEN:
         try:
             fb = FacebookClient(config.FB_PAGE_ID, config.FB_ACCESS_TOKEN)
@@ -729,7 +730,16 @@ def post_to_platforms(content, platforms, config):
             results['facebook'] = {'success': True, 'post_id': result.get('id')}
         except Exception as e:
             results['facebook'] = {'success': False, 'error': str(e)}
+        
+        # Facebook 限動
+        try:
+            if content.get('image_url'):
+                story_result = fb.post_story(content['image_url'])
+                results['facebook_story'] = {'success': True, 'post_id': story_result.get('post_id')}
+        except Exception as e:
+            results['facebook_story'] = {'success': False, 'error': str(e)}
     
+    # Instagram 貼文
     if 'ig' in platforms and config.IG_ACCOUNT_ID and config.IG_ACCESS_TOKEN:
         try:
             ig = InstagramClient(config.IG_ACCOUNT_ID, config.IG_ACCESS_TOKEN)
@@ -741,7 +751,16 @@ def post_to_platforms(content, platforms, config):
             results['instagram'] = {'success': True, 'post_id': result.get('id')}
         except Exception as e:
             results['instagram'] = {'success': False, 'error': str(e)}
+        
+        # Instagram 限動
+        try:
+            if content.get('image_url'):
+                story_result = ig.post_story(content['image_url'])
+                results['instagram_story'] = {'success': True, 'post_id': story_result.get('id')}
+        except Exception as e:
+            results['instagram_story'] = {'success': False, 'error': str(e)}
     
+    # Threads 貼文（Threads 沒有限動功能）
     if 'threads' in platforms and config.THREADS_USER_ID and config.THREADS_ACCESS_TOKEN:
         try:
             threads = ThreadsClient(config.THREADS_USER_ID, config.THREADS_ACCESS_TOKEN)
