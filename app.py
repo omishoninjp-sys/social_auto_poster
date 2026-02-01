@@ -15,6 +15,7 @@ from shopify_client import ShopifyClient
 from social_clients import FacebookClient, InstagramClient, ThreadsClient
 from smart_selector import SmartSelector
 from config import Config
+from image_utils import create_story_image_url
 import re
 
 app = Flask(__name__)
@@ -718,6 +719,12 @@ def post_to_platforms(content, platforms, config):
     """發布到各平台（貼文 + 限動）"""
     results = {}
     
+    # 預先處理限動圖片（加模糊背景）
+    story_image_url = None
+    if content.get('image_url'):
+        print("[限動] 正在處理圖片（加模糊背景）...")
+        story_image_url = create_story_image_url(content['image_url'])
+    
     # Facebook 貼文
     if 'fb' in platforms and config.FB_PAGE_ID and config.FB_ACCESS_TOKEN:
         try:
@@ -731,10 +738,10 @@ def post_to_platforms(content, platforms, config):
         except Exception as e:
             results['facebook'] = {'success': False, 'error': str(e)}
         
-        # Facebook 限動
+        # Facebook 限動（使用處理過的圖片）
         try:
-            if content.get('image_url'):
-                story_result = fb.post_story(content['image_url'])
+            if story_image_url:
+                story_result = fb.post_story(story_image_url)
                 results['facebook_story'] = {'success': True, 'post_id': story_result.get('post_id')}
         except Exception as e:
             results['facebook_story'] = {'success': False, 'error': str(e)}
@@ -752,10 +759,10 @@ def post_to_platforms(content, platforms, config):
         except Exception as e:
             results['instagram'] = {'success': False, 'error': str(e)}
         
-        # Instagram 限動
+        # Instagram 限動（使用處理過的圖片）
         try:
-            if content.get('image_url'):
-                story_result = ig.post_story(content['image_url'])
+            if story_image_url:
+                story_result = ig.post_story(story_image_url)
                 results['instagram_story'] = {'success': True, 'post_id': story_result.get('id')}
         except Exception as e:
             results['instagram_story'] = {'success': False, 'error': str(e)}
