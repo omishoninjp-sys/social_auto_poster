@@ -4,7 +4,8 @@
 """
 
 import requests
-from PIL import Image, ImageFilter
+import os
+from PIL import Image, ImageFilter, ImageEnhance
 from io import BytesIO
 import base64
 
@@ -64,7 +65,6 @@ def create_story_image(image_url, target_width=1080, target_height=1920):
         background = background.filter(ImageFilter.GaussianBlur(radius=30))
         
         # 降低背景亮度（讓主圖更突出）
-        from PIL import ImageEnhance
         enhancer = ImageEnhance.Brightness(background)
         background = enhancer.enhance(0.6)
         
@@ -81,45 +81,52 @@ def create_story_image(image_url, target_width=1080, target_height=1920):
         return base64.b64encode(buffer.getvalue()).decode('utf-8')
         
     except Exception as e:
-        print(f"圖片處理失敗: {e}")
+        print(f"[限動] 圖片處理失敗: {e}")
         return None
 
 
-def upload_image_to_imgbb(base64_image, api_key=None):
+def upload_image_to_imgbb(base64_image):
     """
-    上傳 Base64 圖片到 ImgBB（免費圖床）
+    上傳 Base64 圖片到 ImgBB
     
     Args:
         base64_image: Base64 編碼的圖片
-        api_key: ImgBB API Key（可選，免費額度有限）
     
     Returns:
         圖片 URL 或 None
     """
+    # 從環境變數取得 API Key
+    api_key = os.getenv('IMGBB_API_KEY')
+    
+    if not api_key:
+        print("[限動] 警告: 未設定 IMGBB_API_KEY，無法上傳處理後的圖片")
+        return None
+    
     try:
         url = "https://api.imgbb.com/1/upload"
         
         data = {
+            'key': api_key,
             'image': base64_image,
         }
-        
-        if api_key:
-            data['key'] = api_key
-        else:
-            # 使用免費匿名上傳
-            data['key'] = '7a9c3e8b5d4f2a1e9c8b7d6f'  # 公開測試 key
         
         response = requests.post(url, data=data, timeout=60)
         
         if response.ok:
             result = response.json()
             if result.get('success'):
-                return result['data']['url']
+                image_url = result['data']['url']
+                print(f"[限動] 圖片上傳成功: {image_url[:60]}...")
+                return image_url
+            else:
+                print(f"[限動] ImgBB 回傳失敗: {result}")
+        else:
+            print(f"[限動] ImgBB HTTP 錯誤: {response.status_code} - {response.text[:200]}")
         
         return None
         
     except Exception as e:
-        print(f"上傳圖片失敗: {e}")
+        print(f"[限動] 上傳圖片失敗: {e}")
         return None
 
 
@@ -133,21 +140,25 @@ def create_story_image_url(image_url):
     Returns:
         限動格式圖片的 URL，或原始 URL（失敗時）
     """
+    # 檢查是否有設定 IMGBB_API_KEY
+    if not os.getenv('IMGBB_API_KEY'):
+        print("[限動] 未設定 IMGBB_API_KEY，跳過圖片處理，使用原圖")
+        return image_url
+    
     # 生成限動圖片
     base64_image = create_story_image(image_url)
     
     if not base64_image:
-        print("圖片處理失敗，使用原圖")
+        print("[限動] 圖片處理失敗，使用原圖")
         return image_url
     
     # 上傳到圖床
     new_url = upload_image_to_imgbb(base64_image)
     
     if new_url:
-        print(f"限動圖片已上傳: {new_url[:50]}...")
         return new_url
     else:
-        print("圖片上傳失敗，使用原圖")
+        print("[限動] 圖片上傳失敗，使用原圖")
         return image_url
 
 
