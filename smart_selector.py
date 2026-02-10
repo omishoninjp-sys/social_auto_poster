@@ -1,13 +1,12 @@
 """
-智慧選擇器 - 隨機選擇商品發文
-方案4：完全隨機，不追蹤已發文商品
+智慧選擇器 - 從最新上架的前10個商品中隨機選擇
 """
 
 import random
 
 
 class SmartSelector:
-    """隨機商品選擇器"""
+    """最新商品選擇器"""
     
     def __init__(self, shopify_client, config):
         self.shopify = shopify_client
@@ -22,7 +21,7 @@ class SmartSelector:
     
     def get_next_product(self, category=None):
         """
-        隨機選擇下一個商品
+        從最新上架的前10個商品中隨機選擇
         
         Args:
             category: 指定類別 ('souvenir' 或 'fashion')，None 為自動交替
@@ -45,11 +44,12 @@ class SmartSelector:
         # 取得商品
         if selected_category == 'souvenir':
             collections = self.souvenir_collections
-            print(f"   📊 隨機選擇伴手禮商品")
+            print(f"   📊 從伴手禮最新 10 個商品中選擇")
         else:
             collections = self.fashion_collections
-            print(f"   📊 隨機選擇服飾商品")
+            print(f"   📊 從服飾最新 10 個商品中選擇")
         
+        # get_products_from_multiple_collections 已按上架時間排序（新的優先）
         products = self.shopify.get_products_from_multiple_collections(collections)
         
         if not products:
@@ -63,9 +63,12 @@ class SmartSelector:
             else:
                 return None, None
         
-        # 隨機選擇一個商品
-        product = random.choice(products)
-        print(f"   ✅ 選擇商品: {product.get('title', 'Unknown')}")
+        # 只取最新的前 10 個商品
+        latest_products = products[:10]
+        
+        # 從最新 10 個中隨機選擇
+        product = random.choice(latest_products)
+        print(f"   ✅ 選擇商品: {product.get('title', 'Unknown')}（從最新 {len(latest_products)} 個中選出）")
         
         # 更新上次類別
         self.last_category = selected_category
@@ -73,7 +76,7 @@ class SmartSelector:
         return product, selected_category
     
     def mark_as_posted(self, product, category):
-        """標記為已發文（方案4不需要，保留空函數）"""
+        """標記為已發文（目前不需要追蹤）"""
         pass
     
     def get_stats(self):
@@ -84,14 +87,16 @@ class SmartSelector:
         return {
             'souvenir': {
                 'total': len(souvenir_products),
+                'latest_10': min(len(souvenir_products), 10),
                 'round': 1,
                 'posted_this_round': 0,
-                'remaining': len(souvenir_products)
+                'remaining': min(len(souvenir_products), 10)
             },
             'fashion': {
                 'total': len(fashion_products),
+                'latest_10': min(len(fashion_products), 10),
                 'round': 1,
                 'posted_this_round': 0,
-                'remaining': len(fashion_products)
+                'remaining': min(len(fashion_products), 10)
             }
         }
