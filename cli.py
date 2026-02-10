@@ -223,7 +223,10 @@ def generate_post_content(product, config):
     # ============================================
     # 生成貼文文字 - FB/IG 版本（有 hashtag）
     # ============================================
-    post_text_with_tags = f"""✨ {title}
+    post_text_with_tags = f"""Goyoutati - 日本伴手禮、服飾專賣店 ｜每日最新商品、補貨資訊
+歡迎follow我，和日本同步最新產品資訊
+
+✨ {title}
 
 {description}
 
@@ -236,7 +239,10 @@ def generate_post_content(product, config):
     # ============================================
     # 生成貼文文字 - Threads 版本（無 hashtag）
     # ============================================
-    post_text_no_tags = f"""✨ {title}
+    post_text_no_tags = f"""Goyoutati - 日本伴手禮、服飾專賣店 ｜每日最新商品、補貨資訊
+歡迎follow我，和日本同步最新產品資訊
+
+✨ {title}
 
 {description}
 
