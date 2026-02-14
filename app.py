@@ -629,6 +629,8 @@ def generate_post_content(product, config):
         brand_tag = '#楓糖男孩'
     elif '菊廼舍' in handle or '菊廼舍' in title:
         brand_tag = '#銀座菊廼舍'
+    elif 'adidas' in handle_lower or 'adidas' in title_lower:
+        brand_tag = '#adidas'
     
     # 動態產生類型 Hashtag
     type_tag = ''

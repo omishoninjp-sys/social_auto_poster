@@ -126,6 +126,8 @@ class ShopifyClient:
             {'title': 'WORKMAN 男裝', 'handle': 'workman-男裝'},
             {'title': 'WORKMAN 女裝', 'handle': 'workman-女裝'},
             {'title': 'WORKMAN 兒童', 'handle': 'workman-兒童'},
+            {'title': 'adidas 男鞋', 'handle': 'adidas-男鞋'},
+            {'title': 'adidas 女鞋', 'handle': 'adidas-女鞋'},
         ]
         return collections
     
@@ -415,6 +417,8 @@ class ShopifyClient:
             'work man 男裝': 'workman-男裝',
             'work man 女裝': 'workman-女裝',
             'work man 兒童': 'workman-兒童',
+            'adidas 男鞋': 'adidas-男鞋',
+            'adidas 女鞋': 'adidas-女鞋',
         }
         
         # 先嘗試直接對應
@@ -428,7 +432,7 @@ class ShopifyClient:
         
         # 嘗試用名稱作為 handle
         return name.lower().replace(' ', '-')
-
+    
 
 # 測試用
 if __name__ == '__main__':
