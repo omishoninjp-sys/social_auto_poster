@@ -192,23 +192,11 @@ ADMIN_HTML = """
         .logout-btn:hover {
             background: rgba(255,255,255,0.3);
         }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
         .stat-box {
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
             border-radius: 12px;
             padding: 20px;
             text-align: center;
-        }
-        .stat-box.souvenir {
-            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-        }
-        .stat-box.fashion {
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
         }
         .stat-box h3 {
             font-size: 14px;
@@ -359,7 +347,7 @@ ADMIN_HTML = """
     <div class="container">
         <div class="header">
             <h1>🎌 御用達 GOYOUTATI</h1>
-            <p>社群自動發文系統</p>
+            <p>社群自動發文系統（服飾專用）</p>
         </div>
 
         <div class="card">
@@ -368,44 +356,28 @@ ADMIN_HTML = """
                 <span class="status online">● 系統運作中</span>
             </div>
             
-            <div class="stats-grid">
-                <div class="stat-box souvenir">
-                    <h3>🍪 伴手禮</h3>
-                    <div class="number" id="souvenir-remaining">-</div>
-                    <div class="detail">剩餘未發 / 總數 <span id="souvenir-total">-</span></div>
-                    <div class="detail">第 <span id="souvenir-round">-</span> 輪</div>
-                </div>
-                <div class="stat-box fashion">
-                    <h3>👔 服飾</h3>
-                    <div class="number" id="fashion-remaining">-</div>
-                    <div class="detail">剩餘未發 / 總數 <span id="fashion-total">-</span></div>
-                    <div class="detail">第 <span id="fashion-round">-</span> 輪</div>
-                </div>
+            <div class="stat-box">
+                <h3>👔 服飾</h3>
+                <div class="number" id="fashion-remaining">-</div>
+                <div class="detail">最新商品池 / 總數 <span id="fashion-total">-</span></div>
             </div>
             
-            <button class="btn btn-secondary" onclick="loadStats()">🔄 重新整理</button>
+            <div style="margin-top: 16px;">
+                <button class="btn btn-secondary" onclick="loadStats()">🔄 重新整理</button>
+            </div>
         </div>
 
         <div class="card">
-            <h2 class="section-title">🚀 立即發文</h2>
+            <h2 class="section-title">🚀 立即發文（服飾）</h2>
             
             <div class="form-group">
                 <label>發文數量</label>
                 <select id="post-count">
                     <option value="1">1 篇</option>
-                    <option value="2">2 篇（1 伴手禮 + 1 服飾）</option>
+                    <option value="2">2 篇</option>
                     <option value="4">4 篇</option>
                     <option value="6">6 篇</option>
                     <option value="10">10 篇</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label>指定類別</label>
-                <select id="post-category">
-                    <option value="">自動交替（1:1）</option>
-                    <option value="souvenir">只發伴手禮</option>
-                    <option value="fashion">只發服飾</option>
                 </select>
             </div>
             
@@ -457,13 +429,8 @@ ADMIN_HTML = """
                 const data = await res.json();
                 
                 if (data.success) {
-                    document.getElementById('souvenir-remaining').textContent = data.stats.souvenir.remaining;
-                    document.getElementById('souvenir-total').textContent = data.stats.souvenir.total;
-                    document.getElementById('souvenir-round').textContent = data.stats.souvenir.round;
-                    
                     document.getElementById('fashion-remaining').textContent = data.stats.fashion.remaining;
                     document.getElementById('fashion-total').textContent = data.stats.fashion.total;
-                    document.getElementById('fashion-round').textContent = data.stats.fashion.round;
                 }
             } catch (e) {
                 console.error('載入統計失敗', e);
@@ -473,7 +440,6 @@ ADMIN_HTML = """
         // 立即發文
         async function postNow() {
             const count = document.getElementById('post-count').value;
-            const category = document.getElementById('post-category').value;
             const platforms = [];
             if (document.getElementById('platform-fb').checked) platforms.push('fb');
             if (document.getElementById('platform-ig').checked) platforms.push('ig');
@@ -488,8 +454,7 @@ ADMIN_HTML = """
             document.getElementById('result-box').classList.remove('show');
             
             try {
-                let url = `${BASE_URL}/api/post?count=${count}&platforms=${platforms.join(',')}`;
-                if (category) url += `&category=${category}`;
+                let url = `${BASE_URL}/api/post?count=${count}&platforms=${platforms.join(',')}&category=fashion`;
                 
                 const res = await fetch(url);
                 const data = await res.json();
@@ -679,7 +644,7 @@ def generate_post_content(product, config):
         type_tag = '#作業服'
     
     # 組合 Hashtag
-    base_tags = '#日本伴手禮 #日本代購 #GOYOUTATI #伴手禮推薦'
+    base_tags = '#日本服飾 #日本代購 #GOYOUTATI #日本潮流'
     hashtags = base_tags
     if brand_tag:
         hashtags += f' {brand_tag}'
@@ -872,7 +837,7 @@ def api_post():
     selector = SmartSelector(shopify, config)
     
     count = min(int(request.args.get('count', 1)), 10)
-    category = request.args.get('category')
+    category = 'fashion'  # 固定只發服飾
     platforms_str = request.args.get('platforms', 'fb,ig,threads')
     platforms = [p.strip() for p in platforms_str.split(',')]
     
@@ -893,7 +858,7 @@ def api_post():
         
         posted.append({
             'title': product.get('title'),
-            'category': '伴手禮' if cat == 'souvenir' else '服飾',
+            'category': '服飾',
             'platforms': results,
             'marked': all_success
         })
@@ -944,13 +909,6 @@ def stats():
     return jsonify({
         'success': True,
         'stats': {
-            'souvenir': {
-                'name': '伴手禮',
-                'total': stats['souvenir']['total'],
-                'round': stats['souvenir']['round'],
-                'posted_this_round': stats['souvenir']['posted_this_round'],
-                'remaining': stats['souvenir']['remaining']
-            },
             'fashion': {
                 'name': '服飾',
                 'total': stats['fashion']['total'],
@@ -965,12 +923,11 @@ def stats():
 @app.route('/post/smart')
 def post_smart():
     """
-    智慧發文（1:1 伴手禮/服飾交替）
+    智慧發文（只發服飾）
     背景執行，立刻回應
     
     Query params:
     - count: 發幾篇（預設 1，最多 10）
-    - category: 指定類別（souvenir/fashion，選填）
     - platforms: 平台，逗號分隔（選填）
     - secret: API 密鑰（建議設定）
     """
@@ -984,7 +941,6 @@ def post_smart():
             return jsonify({'success': False, 'error': 'Unauthorized'}), 401
     
     count = min(int(request.args.get('count', 1)), 10)
-    category = request.args.get('category')
     platforms_str = request.args.get('platforms', 'fb,ig,threads')
     platforms = [p.strip() for p in platforms_str.split(',')]
     
@@ -995,7 +951,7 @@ def post_smart():
         selector = SmartSelector(shopify, config)
         
         for i in range(count):
-            product, cat = selector.get_next_product(category)
+            product, cat = selector.get_next_product('fashion')
             
             if not product:
                 print(f"[背景發文] 沒有找到商品")
@@ -1022,7 +978,7 @@ def post_smart():
         'success': True,
         'message': '發文請求已收到，背景執行中',
         'count': count,
-        'category': category or '自動交替',
+        'category': '服飾',
         'platforms': platforms,
         'timestamp': datetime.now().isoformat()
     })
