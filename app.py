@@ -1028,7 +1028,7 @@ def post_random():
             'error': '過濾成人商品後沒有可發布的商品'
         }), 404
 
-product = random.choice(safe_products)
+    product = random.choice(safe_products)
     
     # 生成貼文
     content = generate_post_content(product, config)
