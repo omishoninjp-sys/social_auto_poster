@@ -13,7 +13,7 @@ import requests
 from datetime import datetime
 from shopify_client import ShopifyClient
 from social_clients import FacebookClient, InstagramClient, ThreadsClient
-from smart_selector import SmartSelector
+from smart_selector import SmartSelector, is_adult_product
 from config import Config
 from image_utils import create_story_image_url
 import re
@@ -1020,7 +1020,15 @@ def post_random():
             'error': '找不到商品'
         }), 404
     
-    product = random.choice(products)
+    # 過濾掉成人商品
+    safe_products = [p for p in products if not is_adult_product(p)]
+    if not safe_products:
+        return jsonify({
+            'success': False,
+            'error': '過濾成人商品後沒有可發布的商品'
+        }), 404
+
+product = random.choice(safe_products)
     
     # 生成貼文
     content = generate_post_content(product, config)
