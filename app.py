@@ -425,118 +425,134 @@ def get_jpy_to_twd_rate():
 
 
 def generate_post_content(product, config):
-    """生成貼文內容"""
-    title = product.get('title', '')
-    description = product.get('body_html', '')
-
-    description = re.sub('<[^<]+?>', '', description)
-    description = re.sub(r'📏\s*尺寸規格.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'尺寸規格\s*尺寸\s+衣長.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'尺寸\s+衣長\s+身寬.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'尺寸\s+腰圍\s+臀圍.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'尺寸\s+總長\s+.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'尺寸\s+高度\s+.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'📦\s*詰合內容.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'詰合內容\s*商品\s+過敏原.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'商品\s+過敏原\s+賞味期限.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'內容量.*?(?=【|※|💰|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'\n{3,}', '\n\n', description).strip()
-    description = description.replace('※不接受退換貨', '※不接受因個人原因退換貨')
-    description = description.replace('※開箱請全程錄影', '※開箱請全程錄影保護消費者權益')
-    description = description[:300] + '...' if len(description) > 300 else description
-
-    variants = product.get('variants', [])
-    price_jpy_str = variants[0].get('price', '0') if variants else '0'
-    try:
-        price_jpy = float(price_jpy_str)
-        if price_jpy > 0:
-            rate = get_jpy_to_twd_rate()
-            price_twd = int(price_jpy * rate)
-            price_line = f"💰 ¥{int(price_jpy):,}（約NT${price_twd:,}）\n含日本至台灣運費"
-        else:
-            price_line = "💰 價格請詢價"
-    except:
-        price_line = "💰 價格請詢價"
-
-    handle = product.get('handle', '')
-    product_url = f"{config.SHOPIFY_STORE_URL}/products/{handle}"
-    images = product.get('images', [])
+    """
+    生成貼文內容
+    文案主打「一條連結，送到你家」服務
+    hashtag 從商品標題 / tags 自動抽關鍵字
+    """
+    title   = product.get('title', '')
+    handle  = product.get('handle', '')
+    images  = product.get('images', [])
     image_urls = [img.get('src') for img in images if img.get('src')]
-    image_url = image_urls[0] if image_urls else None
+    image_url  = image_urls[0] if image_urls else None
 
     tags = product.get('tags', [])
     if isinstance(tags, str):
         tags = [t.strip() for t in tags.split(',') if t.strip()]
     product_type = product.get('product_type', '')
 
+    # ── 價格 ────────────────────────────────────────────────
+    variants = product.get('variants', [])
+    price_jpy_str = variants[0].get('price', '0') if variants else '0'
+    try:
+        price_jpy = float(price_jpy_str)
+        if price_jpy > 0:
+            rate      = get_jpy_to_twd_rate()
+            price_twd = int(price_jpy * rate)
+            price_line = f"💰 ¥{int(price_jpy):,}（約NT${price_twd:,}）\n含關稅，出貨前補運費（每公斤¥1,000／約NT$200）"
+        else:
+            price_line = "💰 價格請詢價"
+    except:
+        price_line = "💰 價格請詢價"
+
+    product_url = 'https://goyoutati.com/pages/%E6%97%A5%E6%9C%AC%E4%BB%A3%E8%B3%BC-%E4%B8%80%E6%A2%9D%E9%80%A3%E7%B5%90-%E9%80%81%E5%88%B0%E4%BD%A0%E5%AE%B6'
+
+    # ── Hashtag：基礎 + 從標題/tags 自動抽關鍵字 ────────────
     handle_lower = handle.lower()
-    title_lower = title.lower()
+    title_lower  = title.lower()
+    all_text     = f"{title_lower} {handle_lower} {product_type.lower()} {' '.join(tags).lower()}"
+
+    # 品牌 tag
     brand_tag = ''
-    for keyword, tag in [
-        ('bape', '#BAPE'), ('workman', '#WORKMAN'), ('human-made', '#HUMANMADE'),
-        ('x-girl', '#XGIRL'), ('yokumoku', '#YOKUMOKU'), ('adidas', '#adidas')
+    for kw, t in [
+        ('bape',        '#BAPE'),
+        ('workman',     '#WORKMAN'),
+        ('human-made',  '#HumanMade'),
+        ('human made',  '#HumanMade'),
+        ('x-girl',      '#Xgirl'),
+        ('yokumoku',    '#YOKUMOKU'),
+        ('adidas',      '#adidas'),
+        ('nike',        '#Nike'),
+        ('uniqlo',      '#UNIQLO'),
+        ('無印',         '#無印良品'),
+        ('muji',        '#MUJI'),
     ]:
-        if keyword in handle_lower or keyword in title_lower:
-            brand_tag = tag
+        if kw in all_text:
+            brand_tag = t
             break
-    for keyword, tag in [
-        ('小倉山莊', '#小倉山莊'), ('砂糖奶油樹', '#砂糖奶油樹'), ('坂角', '#坂角總本舖'),
-        ('風月堂', '#神戶風月堂'), ('虎屋', '#虎屋羊羹'), ('資生堂', '#資生堂PARLOUR'),
-        ('菊廼舍', '#銀座菊廼舍'), ('楓糖', '#楓糖男孩')
+    for kw, t in [
+        ('小倉山莊', '#小倉山莊'), ('砂糖奶油樹', '#砂糖奶油樹'),
+        ('坂角',    '#坂角總本舖'), ('風月堂',    '#神戶風月堂'),
+        ('虎屋',    '#虎屋羊羹'),  ('資生堂',    '#資生堂PARLOUR'),
+        ('菊廼舍',  '#銀座菊廼舍'), ('楓糖',     '#楓糖男孩'),
     ]:
-        if keyword in handle or keyword in title:
-            brand_tag = tag
+        if kw in title or kw in handle:
+            brand_tag = t
             break
 
-    all_text = f"{handle_lower} {product_type.lower()} {' '.join(tags).lower()}"
-    type_tag = ''
-    if '兒童' in handle or 'kids' in all_text:
-        type_tag = '#KIDS'
-    elif '男裝' in handle or 'mens' in all_text or 'men' in all_text:
-        type_tag = '#MENS'
-    elif '女裝' in handle or 'womens' in all_text or 'women' in all_text:
-        type_tag = '#WOMENS'
-    elif '作業服' in handle:
-        type_tag = '#作業服'
+    # 商品類型 tag（從標題關鍵字抓）
+    keyword_tags = []
+    keyword_map = [
+        # 服飾
+        ('外套',   '#外套'), ('夾克',  '#夾克'), ('連帽',   '#連帽'),
+        ('T恤',    '#T恤'),  ('Tシャツ','#Tシャツ'), ('褲',  '#褲裝'),
+        ('裙',     '#裙裝'), ('包包',  '#包包'), ('鞋',     '#鞋款'),
+        # 家電 / 3C
+        ('美容儀', '#美容儀'), ('掃地機', '#掃地機器人'), ('空氣清淨', '#空氣清淨機'),
+        ('耳機',   '#耳機'),  ('戒指',  '#智慧戒指'),  ('相機',    '#相機'),
+        ('電動牙刷','#電動牙刷'),
+        # 食品
+        ('巧克力', '#巧克力'), ('餅乾',  '#日本餅乾'), ('羊羹', '#和菓子'),
+        ('甜點',   '#日本甜點'),
+    ]
+    for kw, t in keyword_map:
+        if kw in title or kw in all_text:
+            keyword_tags.append(t)
+            if len(keyword_tags) >= 2:
+                break
 
-    base_tags = '#日本服飾 #日本代購 #GOYOUTATI #日本潮流'
-    hashtags = base_tags
-    if brand_tag:
-        hashtags += f' {brand_tag}'
-    if type_tag:
-        hashtags += f' {type_tag}'
+    # ── 固定服務文案 ─────────────────────────────────────────
+    service_body = """🇯🇵 看到喜歡的日本商品，貼上連結就能買！
+GOYOUTATI 御用達幫你代購，空運含稅直送台灣。
 
-    post_text_with_tags = f"""Goyoutati - 日本伴手禮、服飾專賣店 ｜每日最新商品、補貨資訊
-歡迎follow我，和日本同步最新產品資訊
+📦 服務流程
+1️⃣ 貼上任意日本商品連結，或直接在本站下單
+2️⃣ 我們代購並集運至台灣倉（免費存放最長 1 個月）
+3️⃣ 到倉 Email 通知 → 確認運費 → 到府配送
 
-✨ {title}
+✅ 含稅含關稅，無隱藏費用
+✅ 業界最低，每公斤1,000円日幣約台幣200
+✅ 無最低出貨重量，1KG也能出貨
+✅ 無台灣端派送費"""
 
-{description}
+    # ── 組合貼文（FB / IG 版，含 hashtag）──────────────────
+    post_text_with_tags = f"""✨ {title}
+
+{service_body}
 
 {price_line}
 🛒 立即購買：{product_url}
-
-{hashtags}
 """
-    post_text_no_tags = f"""Goyoutati - 日本伴手禮、服飾專賣店 ｜每日最新商品、補貨資訊
-歡迎follow我，和日本同步最新產品資訊
 
-✨ {title}
+    # ── Threads 版（無 hashtag，截到 500 字）────────────────
+    post_text_no_tags = f"""✨ {title}
 
-{description}
+{service_body}
 
 {price_line}
 🛒 立即購買：{product_url}
 """
+    if len(post_text_no_tags) > 500:
+        post_text_no_tags = post_text_no_tags[:497] + '...'
+
     return {
-        'text': post_text_with_tags,
+        'text':         post_text_with_tags,
         'text_no_tags': post_text_no_tags,
-        'image_url': image_url,
-        'image_urls': image_urls,
-        'product_url': product_url,
-        'title': title
+        'image_url':    image_url,
+        'image_urls':   image_urls,
+        'product_url':  product_url,
+        'title':        title
     }
-
 
 def post_to_platforms(content, platforms, config):
     """發布到各平台（貼文 + 限動）"""
