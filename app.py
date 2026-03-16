@@ -350,6 +350,36 @@ ADMIN_HTML = """
 webhook_log = []  # [{'time', 'title', 'platforms', 'success'}]
 MAX_LOG = 50
 
+# ============================================
+# 去重機制
+# 同一個商品 handle 在 DEDUP_TTL 秒內不重複發文
+# ============================================
+recently_posted = {}      # { handle: timestamp }
+DEDUP_TTL = 3600          # 1 小時
+DEDUP_LOCK = threading.Lock()
+
+
+def is_duplicate(product):
+    """回傳 True 表示近期已發過，應跳過"""
+    handle = product.get('handle') or str(product.get('id', ''))
+    now = time.time()
+    with DEDUP_LOCK:
+        # 清理過期記錄
+        for k in [k for k, ts in recently_posted.items() if now - ts > DEDUP_TTL]:
+            del recently_posted[k]
+        if handle in recently_posted:
+            elapsed = int(now - recently_posted[handle])
+            print(f"[去重] ⏭️  {handle} 在 {elapsed} 秒前已發過，跳過")
+            return True
+        return False
+
+
+def mark_posted_dedup(product):
+    """發文成功後，把 handle 記錄到去重表"""
+    handle = product.get('handle') or str(product.get('id', ''))
+    with DEDUP_LOCK:
+        recently_posted[handle] = time.time()
+
 
 def append_log(title, platforms_result):
     """記錄發文結果"""
@@ -536,16 +566,20 @@ def post_to_platforms(content, platforms, config):
             results['facebook_story'] = {'success': False, 'error': str(e)}
 
     if 'ig' in platforms and config.IG_ACCOUNT_ID and config.IG_ACCESS_TOKEN:
-        try:
-            ig = InstagramClient(config.IG_ACCOUNT_ID, config.IG_ACCESS_TOKEN)
-            image_urls = content.get('image_urls', [])
-            if len(image_urls) > 1:
-                result = ig.post_carousel(content['text'], image_urls[:10])
-            else:
-                result = ig.post(content['text'], content['image_url'])
-            results['instagram'] = {'success': True, 'post_id': result.get('id')}
-        except Exception as e:
-            results['instagram'] = {'success': False, 'error': str(e)}
+        if not content.get('image_url'):
+            results['instagram'] = {'success': False, 'error': '商品無圖片，跳過 IG'}
+            print("[IG] ⚠️  商品無圖片，跳過 Instagram")
+        else:
+            try:
+                ig = InstagramClient(config.IG_ACCOUNT_ID, config.IG_ACCESS_TOKEN)
+                image_urls = content.get('image_urls', [])
+                if len(image_urls) > 1:
+                    result = ig.post_carousel(content['text'], image_urls[:10])
+                else:
+                    result = ig.post(content['text'], content['image_url'])
+                results['instagram'] = {'success': True, 'post_id': result.get('id')}
+            except Exception as e:
+                results['instagram'] = {'success': False, 'error': str(e)}
         try:
             if story_image_url:
                 story_result = ig.post_story(story_image_url)
@@ -556,7 +590,11 @@ def post_to_platforms(content, platforms, config):
     if 'threads' in platforms and config.THREADS_USER_ID and config.THREADS_ACCESS_TOKEN:
         try:
             threads = ThreadsClient(config.THREADS_USER_ID, config.THREADS_ACCESS_TOKEN)
-            result = threads.post(content.get('text_no_tags', content['text']), content['image_url'])
+            threads_text = content.get('text_no_tags', content['text'])
+            # Threads 最多 500 字元
+            if len(threads_text) > 500:
+                threads_text = threads_text[:497] + '...'
+            result = threads.post(threads_text, content['image_url'])
             results['threads'] = {'success': True, 'post_id': result.get('id')}
         except Exception as e:
             results['threads'] = {'success': False, 'error': str(e)}
@@ -605,6 +643,10 @@ def handle_new_product_async(product):
 
     print(f"[Webhook] 收到新商品：{title} (ID: {product_id})")
 
+    # ── 去重：同一 handle 1 小時內只發一次 ──────────────────
+    if is_duplicate(product):
+        return
+
     # 等待 Shopify 後台處理 collection 關聯（通常 1~3 秒）
     time.sleep(5)
 
@@ -623,6 +665,9 @@ def handle_new_product_async(product):
     if is_adult_product(product):
         print(f"[Webhook] 🔞 成人商品，跳過：{title}")
         return
+
+    # ── 先佔位，防止其他執行緒同時進來 ──────────────────────
+    mark_posted_dedup(product)
 
     print(f"[Webhook] ✅ 確認商品在系列中，準備發文：{title}")
 
